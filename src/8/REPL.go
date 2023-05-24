@@ -271,6 +271,22 @@ func leaf_node_num_cells(node []byte) uint32 {
 	return uint32(ret)
 }
 
+func inc_leaf_node_num_cells(node []byte) uint32 {
+
+	ret, err := utils.BytesToInt(node[LEAF_NODE_NUM_CELLS_OFFSET:LEAF_NODE_NUM_CELLS_OFFSET+4], false)
+	if err != nil {
+		fmt.Println(err)
+	}
+	ret = ret + 1
+	b2, err := utils.IntToBytes(int(ret), 4)
+
+	if err != nil {
+		fmt.Println(err)
+	}
+	copy(node[LEAF_NODE_NUM_CELLS_OFFSET:LEAF_NODE_NUM_CELLS_OFFSET+4], b2)
+	return uint32(ret)
+}
+
 func leaf_node_cell(node []byte, cell_num int32) []byte {
 	return node[LEAF_NODE_HEADER_SIZE+cell_num*LEAF_NODE_CELL_SIZE:]
 }
@@ -284,6 +300,9 @@ func leaf_node_key(node []byte, cell_num int32) int32 {
 	return ret
 }
 
+/**
+*   b2 作为返回值，没有直接影响到
+**/
 func set_leaf_node_key(node []byte, cell_num int32, new_key int32) {
 	b := leaf_node_cell(node, cell_num)
 	b2, err := utils.IntToBytes(int(new_key), 4)
@@ -345,8 +364,9 @@ func leaf_node_insert(cursor *Cursor, key uint32, value *enums.Row) {
 		}
 	}
 
-	new_num_cells := leaf_node_num_cells(node)
-	new_num_cells += 1
+	// new_num_cells := leaf_node_num_cells(node)
+	// new_num_cells += 1
+	inc_leaf_node_num_cells(node)
 
 	set_leaf_node_key(node, cursor.cell_num, int32(key))
 	// new_node_key := leaf_node_key(node, cursor.cell_num)
@@ -518,6 +538,13 @@ func pager_open(filename string) Pager {
 	if fileInfo.Size()%PAGE_SIZE != 0 {
 		fmt.Println("Db file is not a whole number of pages. Corrupt file.")
 		os.Exit(1)
+	}
+
+	for page_i := 0; page_i < int(pager.num_pages); page_i++ {
+		_, err := pager.file_descriptor.ReadAt(pager.pages[page_i][:], int64(PAGE_SIZE*page_i))
+		if err != nil {
+			fmt.Println(page_i, " read page failed! ", err)
+		}
 	}
 
 	// pager.pages nothing
@@ -716,6 +743,7 @@ loop:
 
 		fmt.Printf(" sql: %s.", input)
 		// db_close(&table)
+		break
 	}
 
 	// free_table(table)

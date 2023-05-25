@@ -10,7 +10,7 @@ func init() {
 }
 
 type executeResult struct {
-	EXECUTE_SUCCESS, EXECUTE_TABLE_FULL int
+	EXECUTE_SUCCESS, EXECUTE_DUPLICATE_KEY, EXECUTE_TABLE_FULL int
 }
 
 func (c executeResult) Get(id string) int {
@@ -26,8 +26,9 @@ func (c executeResult) Get(id string) int {
 }
 
 var ExecuteResult = executeResult{
-	EXECUTE_SUCCESS:    0,
-	EXECUTE_TABLE_FULL: 1,
+	EXECUTE_SUCCESS:       0,
+	EXECUTE_DUPLICATE_KEY: 1,
+	EXECUTE_TABLE_FULL:    2,
 }
 
 type metaCommandResult struct {
@@ -129,5 +130,5 @@ func (c nodeType) Get(id string) int {
 
 var NodeType = nodeType{
 	NODE_INTERNAL: 0,
-	NODE_LEAF: 1,
+	NODE_LEAF:     1,
 }

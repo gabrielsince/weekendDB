@@ -1,8 +1,8 @@
 package main
 
 import (
-	enums "10/enums"
-	utils "10/utils"
+	enums "11/enums"
+	utils "11/utils"
 
 	// "bufio"
 	"bytes"
@@ -12,6 +12,9 @@ import (
 	"strings"
 	"unsafe"
 )
+
+//  Necesitamos una prueba de esfuerzo aqui
+//  como más de 4000 filas de entrada sin problema.
 
 // int的大小是和操作系统位数相关的,
 // 如果是32位操作系统,
@@ -513,10 +516,67 @@ func table_find(table *Table, key uint32) Cursor {
 	if get_node_type(root_node) == int32(enums.NodeType.NODE_LEAF) {
 		return leaf_node_find(table, root_page_num, (int32)(key))
 	} else {
-		fmt.Println("Need to implement searching an internal node")
-		os.Exit(1)
-		return Cursor{}
+		return internal_node_find(table, uint32(root_page_num), key)
+		// fmt.Println("Need to implement searching an internal node")
+		// os.Exit(1)
+		// return Cursor{}
 	}
+}
+
+// +Cursor* internal_node_find(Table* table, uint32_t page_num, uint32_t key) {
+// 	+  void* node = get_page(table->pager, page_num);
+// 	+  uint32_t num_keys = *internal_node_num_keys(node);
+// 	+
+// 	+  /* Binary search to find index of child to search */
+// 	+  uint32_t min_index = 0;
+// 	+  uint32_t max_index = num_keys; /* there is one more child than key */
+// 	+
+// 	+  while (min_index != max_index) {
+// 	+    uint32_t index = (min_index + max_index) / 2;
+// 	+    uint32_t key_to_right = *internal_node_key(node, index);
+// 	+    if (key_to_right >= key) {
+// 	+      max_index = index;
+// 	+    } else {
+// 	+      min_index = index + 1;
+// 	+    }
+// 	+  }
+// +  uint32_t child_num = *internal_node_child(node, min_index);
+// +  void* child = get_page(table->pager, child_num);
+// +  switch (get_node_type(child)) {
+// +    case NODE_LEAF:
+// +      return leaf_node_find(table, child_num, key);
+// +    case NODE_INTERNAL:
+// +      return internal_node_find(table, child_num, key);
+// +  }
+// +}
+
+func internal_node_find(table *Table, page_num uint32, key uint32) Cursor {
+	var node = get_page(&table.pager, int32(page_num))
+	var num_keys = get_internal_node_num_keys(node)
+
+	/* Binary search to find index of child to search */
+	var min_index = int32(0)
+	var max_index = num_keys /* there is one more child than key */
+
+	for min_index != max_index {
+		var index = (min_index + max_index) / 2
+		var key_to_right = get_internal_node_key(node, uint32(index))
+		if key_to_right >= int32(key) {
+			max_index = index
+		} else {
+			min_index = index + 1
+		}
+	}
+
+	var child_num = get_internal_node_child(node, uint32(min_index))
+	var child = get_page(&table.pager, int32(child_num))
+	switch get_node_type(child) {
+	case enums.NodeType.NODE_LEAF:
+		return leaf_node_find(table, int32(child_num), int32(key))
+	case enums.NodeType.NODE_INTERNAL:
+		return internal_node_find(table, child_num, key)
+	}
+	return Cursor{}
 }
 
 // +Cursor* leaf_node_find(Table* table, uint32_t page_num, uint32_t key) {
@@ -1016,7 +1076,7 @@ func get_internal_node_num_keys(node []byte) int32 {
 }
 
 func internal_node_right_child(node []byte) []byte {
-	return node[:INTERNAL_NODE_RIGHT_CHILD_OFFSET]
+	return node[INTERNAL_NODE_RIGHT_CHILD_OFFSET:]
 }
 
 func set_internal_node_right_child(node []byte, num uint32) {
@@ -1256,13 +1316,13 @@ loop:
 		// 	fmt.Println("There were errors reading, exiting program.")
 		// 	return
 		// }
-		// input_template := "insert #{i} user#{i} person#{i}@example.com"
-		// input := strings.Replace(input_template, "#{i}", "14", -1)
+		input_template := "insert #{i} user#{i} person#{i}@example.com"
+		input := strings.Replace(input_template, "#{i}", "16", -1)
 
 		// input := "insert 1 cstack foo@bar.com"
 		// input := "insert 2 cstack2 foo@bar.com"
 		// input := "select"
-		input := ".btree"
+		// input := ".btree"
 
 		if strings.HasPrefix(input, ".") {
 			switch do_meta_command(input, &table) {

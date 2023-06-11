@@ -1,8 +1,8 @@
 package main
 
 import (
-	enums "10/enums"
-	utils "10/utils"
+	enums "12/enums"
+	utils "12/utils"
 
 	// "bufio"
 	"bytes"
@@ -12,6 +12,9 @@ import (
 	"strings"
 	"unsafe"
 )
+
+//  Necesitamos una prueba de esfuerzo aqui
+//  como más de 4000 filas de entrada sin problema.
 
 // int的大小是和操作系统位数相关的,
 // 如果是32位操作系统,
@@ -226,7 +229,11 @@ const (
 const (
 	LEAF_NODE_NUM_CELLS_SIZE   = int32(unsafe.Sizeof(uint32(0)))
 	LEAF_NODE_NUM_CELLS_OFFSET = COMMON_NODE_HEADER_SIZE
-	LEAF_NODE_HEADER_SIZE      = COMMON_NODE_HEADER_SIZE + LEAF_NODE_NUM_CELLS_SIZE
+	// LEAF_NODE_HEADER_SIZE      = COMMON_NODE_HEADER_SIZE + LEAF_NODE_NUM_CELLS_SIZE
+	LEAF_NODE_NEXT_LEAF_SIZE   = int32(unsafe.Sizeof(uint32(0)))
+	LEAF_NODE_NEXT_LEAF_OFFSET = LEAF_NODE_NUM_CELLS_OFFSET + LEAF_NODE_NUM_CELLS_SIZE
+	LEAF_NODE_HEADER_SIZE      = COMMON_NODE_HEADER_SIZE + LEAF_NODE_NUM_CELLS_SIZE +
+		LEAF_NODE_NEXT_LEAF_SIZE
 )
 
 // +/*
@@ -301,19 +308,41 @@ func inc_leaf_node_num_cells(node []byte) uint32 {
 	return uint32(ret)
 }
 
-func set_leaf_node_num_cells(node []byte, num int) {
+func set_leaf_node_num_cells(node []byte, num int32) {
 
 	// ret, err := utils.BytesToInt(node[LEAF_NODE_NUM_CELLS_OFFSET:LEAF_NODE_NUM_CELLS_OFFSET+4], false)
 	// if err != nil {
 	// 	fmt.Println(err)
 	// }
 	// ret = ret + 1
-	b2, err := utils.IntToBytes(num, 4)
+	b2, err := utils.IntToBytes(int(num), 4)
 
 	if err != nil {
 		fmt.Println(err)
 	}
 	copy(node[LEAF_NODE_NUM_CELLS_OFFSET:LEAF_NODE_NUM_CELLS_OFFSET+LEAF_NODE_NUM_CELLS_SIZE], b2)
+}
+
+func get_leaf_node_next_leaf(node []byte) uint32 {
+
+	ret, err := utils.BytesToInt(node[LEAF_NODE_NEXT_LEAF_OFFSET:LEAF_NODE_NEXT_LEAF_OFFSET+LEAF_NODE_NEXT_LEAF_SIZE], false)
+	if err != nil {
+		fmt.Println(err)
+	}
+	return uint32(ret)
+
+}
+
+func set_leaf_node_next_leaf(node []byte, val uint32) {
+
+	b2, err := utils.IntToBytes(int(val), byte(LEAF_NODE_NEXT_LEAF_SIZE))
+
+	if err != nil {
+		fmt.Println(err)
+	}
+	copy(node[LEAF_NODE_NEXT_LEAF_OFFSET:LEAF_NODE_NEXT_LEAF_OFFSET+LEAF_NODE_NEXT_LEAF_SIZE], b2)
+
+	// return node + LEAF_NODE_NEXT_LEAF_OFFSET;
 }
 
 func leaf_node_cell(node []byte, cell_num int32) []byte {
@@ -351,6 +380,8 @@ func initialize_leaf_node(node []byte) {
 	set_node_type(node, uint8(enums.NodeType.NODE_LEAF))
 	set_node_root(node, false)
 	set_leaf_node_num_cells(node, 0)
+
+	set_leaf_node_next_leaf(node, 0) // 0 represents no sibling
 }
 
 // +void leaf_node_insert(Cursor* cursor, uint32_t key, Row* value) {
@@ -459,17 +490,27 @@ type Cursor struct {
 	end_of_table bool
 }
 
+// func table_start(table *Table) Cursor {
+// 	var cursor = Cursor{}
+// 	cursor.table = table
+// 	// cursor.row_num = (table.num_rows == 0)
+// 	// cursor.end_of_table = false
+
+// 	cursor.page_num = int32(table.root_page_num)
+// 	cursor.cell_num = 0
+// 	root_node := get_page(&table.pager, table.root_page_num)
+
+// 	num_cells := leaf_node_num_cells(root_node)
+// 	cursor.end_of_table = (num_cells == 0)
+
+// 	return cursor
+// }
+
 func table_start(table *Table) Cursor {
-	var cursor = Cursor{}
-	cursor.table = table
-	// cursor.row_num = (table.num_rows == 0)
-	// cursor.end_of_table = false
+	var cursor = table_find(table, 0)
 
-	cursor.page_num = int32(table.root_page_num)
-	cursor.cell_num = 0
-	root_node := get_page(&table.pager, table.root_page_num)
-
-	num_cells := leaf_node_num_cells(root_node)
+	var node = get_page(&table.pager, cursor.page_num)
+	var num_cells = leaf_node_num_cells(node)
 	cursor.end_of_table = (num_cells == 0)
 
 	return cursor
@@ -513,10 +554,67 @@ func table_find(table *Table, key uint32) Cursor {
 	if get_node_type(root_node) == int32(enums.NodeType.NODE_LEAF) {
 		return leaf_node_find(table, root_page_num, (int32)(key))
 	} else {
-		fmt.Println("Need to implement searching an internal node")
-		os.Exit(1)
-		return Cursor{}
+		return internal_node_find(table, uint32(root_page_num), key)
+		// fmt.Println("Need to implement searching an internal node")
+		// os.Exit(1)
+		// return Cursor{}
 	}
+}
+
+// +Cursor* internal_node_find(Table* table, uint32_t page_num, uint32_t key) {
+// 	+  void* node = get_page(table->pager, page_num);
+// 	+  uint32_t num_keys = *internal_node_num_keys(node);
+// 	+
+// 	+  /* Binary search to find index of child to search */
+// 	+  uint32_t min_index = 0;
+// 	+  uint32_t max_index = num_keys; /* there is one more child than key */
+// 	+
+// 	+  while (min_index != max_index) {
+// 	+    uint32_t index = (min_index + max_index) / 2;
+// 	+    uint32_t key_to_right = *internal_node_key(node, index);
+// 	+    if (key_to_right >= key) {
+// 	+      max_index = index;
+// 	+    } else {
+// 	+      min_index = index + 1;
+// 	+    }
+// 	+  }
+// +  uint32_t child_num = *internal_node_child(node, min_index);
+// +  void* child = get_page(table->pager, child_num);
+// +  switch (get_node_type(child)) {
+// +    case NODE_LEAF:
+// +      return leaf_node_find(table, child_num, key);
+// +    case NODE_INTERNAL:
+// +      return internal_node_find(table, child_num, key);
+// +  }
+// +}
+
+func internal_node_find(table *Table, page_num uint32, key uint32) Cursor {
+	var node = get_page(&table.pager, int32(page_num))
+	var num_keys = get_internal_node_num_keys(node)
+
+	/* Binary search to find index of child to search */
+	var min_index = int32(0)
+	var max_index = num_keys /* there is one more child than key */
+
+	for min_index != max_index {
+		var index = (min_index + max_index) / 2
+		var key_to_right = get_internal_node_key(node, uint32(index))
+		if key_to_right >= int32(key) {
+			max_index = index
+		} else {
+			min_index = index + 1
+		}
+	}
+
+	var child_num = get_internal_node_child(node, uint32(min_index))
+	var child = get_page(&table.pager, int32(child_num))
+	switch get_node_type(child) {
+	case enums.NodeType.NODE_LEAF:
+		return leaf_node_find(table, int32(child_num), int32(key))
+	case enums.NodeType.NODE_INTERNAL:
+		return internal_node_find(table, child_num, key)
+	}
+	return Cursor{}
 }
 
 // +Cursor* leaf_node_find(Table* table, uint32_t page_num, uint32_t key) {
@@ -643,7 +741,17 @@ func cursor_advance(cursor *Cursor) {
 	cursor.cell_num += 1
 
 	if uint32(cursor.cell_num) >= leaf_node_num_cells(node) {
-		cursor.end_of_table = true
+		// cursor.end_of_table = true
+
+		/* Advance to next leaf node */
+		var next_page_num = get_leaf_node_next_leaf(node)
+		if next_page_num == 0 {
+			/* This was rightmost leaf */
+			cursor.end_of_table = true
+		} else {
+			cursor.page_num = int32(next_page_num)
+			cursor.cell_num = 0
+		}
 	}
 }
 
@@ -865,6 +973,9 @@ func leaf_node_split_and_insert(cursor *Cursor, key uint32, value *enums.Row) {
 	var new_page_num = get_unused_page_num(&cursor.table.pager)
 	var new_node = get_page(&cursor.table.pager, new_page_num)
 	initialize_leaf_node(new_node)
+	u := get_leaf_node_next_leaf(old_node)
+	set_leaf_node_next_leaf(new_node, u)
+	set_leaf_node_next_leaf(old_node, uint32(new_page_num))
 
 	/*
 		All existing keys plus new key should be divided
@@ -902,8 +1013,8 @@ func leaf_node_split_and_insert(cursor *Cursor, key uint32, value *enums.Row) {
 	}
 
 	/* Update cell count on both leaf nodes */
-	set_leaf_node_num_cells(old_node, int(LEAF_NODE_LEFT_SPLIT_COUNT))
-	set_leaf_node_num_cells(new_node, int(LEAF_NODE_RIGHT_SPLIT_COUNT))
+	set_leaf_node_num_cells(old_node, (LEAF_NODE_LEFT_SPLIT_COUNT))
+	set_leaf_node_num_cells(new_node, (LEAF_NODE_RIGHT_SPLIT_COUNT))
 
 	if is_node_root(old_node) {
 		create_new_root(cursor.table, uint32(new_page_num))
@@ -1016,7 +1127,7 @@ func get_internal_node_num_keys(node []byte) int32 {
 }
 
 func internal_node_right_child(node []byte) []byte {
-	return node[:INTERNAL_NODE_RIGHT_CHILD_OFFSET]
+	return node[INTERNAL_NODE_RIGHT_CHILD_OFFSET:]
 }
 
 func set_internal_node_right_child(node []byte, num uint32) {
@@ -1257,12 +1368,12 @@ loop:
 		// 	return
 		// }
 		// input_template := "insert #{i} user#{i} person#{i}@example.com"
-		// input := strings.Replace(input_template, "#{i}", "14", -1)
+		// input := strings.Replace(input_template, "#{i}", "15", -1)
 
 		// input := "insert 1 cstack foo@bar.com"
 		// input := "insert 2 cstack2 foo@bar.com"
-		// input := "select"
-		input := ".btree"
+		input := "select"
+		// input := ".btree"
 
 		if strings.HasPrefix(input, ".") {
 			switch do_meta_command(input, &table) {

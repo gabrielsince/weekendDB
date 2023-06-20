@@ -1,9 +1,10 @@
 package main
 
 import (
-	enums "13/enums"
-	utils "13/utils"
+	enums "14/enums"
+	utils "14/utils"
 	"flag"
+	"math"
 
 	// "bufio"
 	"bytes"
@@ -385,30 +386,6 @@ func initialize_leaf_node(node []byte) {
 	set_leaf_node_next_leaf(node, 0) // 0 represents no sibling
 }
 
-// +void leaf_node_insert(Cursor* cursor, uint32_t key, Row* value) {
-// 	+  void* node = get_page(cursor->table->pager, cursor->page_num);
-// 	+
-// 	+  uint32_t num_cells = *leaf_node_num_cells(node);
-// 	+  if (num_cells >= LEAF_NODE_MAX_CELLS) {
-// 	+    // Node full
-// 	+    printf("Need to implement splitting a leaf node.\n");
-// 	+    exit(EXIT_FAILURE);
-// 	+  }
-// 	+
-// 	+  if (cursor->cell_num < num_cells) {
-// 	+    // Make room for new cell
-// 	+    for (uint32_t i = num_cells; i > cursor->cell_num; i--) {
-// 	+      memcpy(leaf_node_cell(node, i), leaf_node_cell(node, i - 1),
-// 	+             LEAF_NODE_CELL_SIZE);
-// 	+    }
-// 	+  }
-// 	+
-// 	+  *(leaf_node_num_cells(node)) += 1;
-// 	+  *(leaf_node_key(node, cursor->cell_num)) = key;
-// 	+  serialize_row(value, leaf_node_value(node, cursor->cell_num));
-// 	+}
-// 	+
-
 func leaf_node_insert(cursor *Cursor, key uint32, value *enums.Row) {
 	node := get_page(&cursor.table.pager, int32(cursor.page_num))
 	num_cells := int32(leaf_node_num_cells(node))
@@ -491,22 +468,6 @@ type Cursor struct {
 	end_of_table bool
 }
 
-// func table_start(table *Table) Cursor {
-// 	var cursor = Cursor{}
-// 	cursor.table = table
-// 	// cursor.row_num = (table.num_rows == 0)
-// 	// cursor.end_of_table = false
-
-// 	cursor.page_num = int32(table.root_page_num)
-// 	cursor.cell_num = 0
-// 	root_node := get_page(&table.pager, table.root_page_num)
-
-// 	num_cells := leaf_node_num_cells(root_node)
-// 	cursor.end_of_table = (num_cells == 0)
-
-// 	return cursor
-// }
-
 func table_start(table *Table) Cursor {
 	var cursor = table_find(table, 0)
 
@@ -531,23 +492,6 @@ func table_end(table *Table) Cursor {
 	return cursor
 }
 
-// /*
-// +Return the position of the given key.
-// +If the key is not present, return the position
-// +where it should be inserted
-// +*/
-// Cursor* table_find(Table* table, uint32_t key) {
-// 	  uint32_t root_page_num = table->root_page_num;
-// 	  void* root_node = get_page(table->pager, root_page_num);
-
-// 	  if (get_node_type(root_node) == NODE_LEAF) {
-// 	    return leaf_node_find(table, root_page_num, key);
-// 	  } else {
-// 	    printf("Need to implement searching an internal node\n");
-// 	    exit(EXIT_FAILURE);
-// 	 }
-// }
-
 func table_find(table *Table, key uint32) Cursor {
 	var root_page_num = table.root_page_num
 	var root_node = get_page(&table.pager, root_page_num)
@@ -562,56 +506,12 @@ func table_find(table *Table, key uint32) Cursor {
 	}
 }
 
-// +Cursor* internal_node_find(Table* table, uint32_t page_num, uint32_t key) {
-// 	+  void* node = get_page(table->pager, page_num);
-// 	+  uint32_t num_keys = *internal_node_num_keys(node);
-// 	+
-// 	+  /* Binary search to find index of child to search */
-// 	+  uint32_t min_index = 0;
-// 	+  uint32_t max_index = num_keys; /* there is one more child than key */
-// 	+
-// 	+  while (min_index != max_index) {
-// 	+    uint32_t index = (min_index + max_index) / 2;
-// 	+    uint32_t key_to_right = *internal_node_key(node, index);
-// 	+    if (key_to_right >= key) {
-// 	+      max_index = index;
-// 	+    } else {
-// 	+      min_index = index + 1;
-// 	+    }
-// 	+  }
-// +  uint32_t child_num = *internal_node_child(node, min_index);
-// +  void* child = get_page(table->pager, child_num);
-// +  switch (get_node_type(child)) {
-// +    case NODE_LEAF:
-// +      return leaf_node_find(table, child_num, key);
-// +    case NODE_INTERNAL:
-// +      return internal_node_find(table, child_num, key);
-// +  }
-// +}
-
 func internal_node_find(table *Table, page_num uint32, key uint32) Cursor {
 
 	var node = get_page(&table.pager, int32(page_num))
 
 	var child_index = internal_node_find_child(node, key)
 	var child_num = get_internal_node_child(node, child_index)
-
-	// var node = get_page(&table.pager, int32(page_num))
-	// var num_keys = get_internal_node_num_keys(node)
-
-	// /* Binary search to find index of child to search */
-	// var min_index = int32(0)
-	// var max_index = num_keys /* there is one more child than key */
-
-	// for min_index != max_index {
-	// 	var index = (min_index + max_index) / 2
-	// 	var key_to_right = get_internal_node_key(node, uint32(index))
-	// 	if key_to_right >= int32(key) {
-	// 		max_index = index
-	// 	} else {
-	// 		min_index = index + 1
-	// 	}
-	// }
 
 	// var child_num = get_internal_node_child(node, uint32(min_index))
 	var child = get_page(&table.pager, int32(child_num))
@@ -643,15 +543,6 @@ func internal_node_find_child(node []byte, key uint32) uint32 {
 	}
 
 	return uint32(min_index)
-	// var child_num = get_internal_node_child(node, uint32(min_index))
-	// var child = get_page(&table.pager, int32(child_num))
-	// switch get_node_type(child) {
-	// case enums.NodeType.NODE_LEAF:
-	// 	return leaf_node_find(table, int32(child_num), int32(key))
-	// case enums.NodeType.NODE_INTERNAL:
-	// 	return internal_node_find(table, child_num, key)
-	// }
-	// return Cursor{}
 }
 
 func internal_node_insert(table *Table, parent_page_num int32,
@@ -662,26 +553,43 @@ func internal_node_insert(table *Table, parent_page_num int32,
 
 	var parent = get_page(&table.pager, parent_page_num)
 	var child = get_page(&table.pager, child_page_num)
-	var child_max_key = get_node_max_key(child)
+	var child_max_key = get_node_max_key(&table.pager, child)
 	var index = internal_node_find_child(parent, uint32(child_max_key))
 
 	var original_num_keys = get_internal_node_num_keys(parent)
-	set_internal_node_num_keys(parent, int(original_num_keys+1))
+	// set_internal_node_num_keys(parent, int(original_num_keys+1))
 
 	if original_num_keys >= INTERNAL_NODE_MAX_CELLS {
-		fmt.Printf("Need to implement splitting internal node\n")
-		os.Exit(1)
+		// fmt.Printf("Need to implement splitting internal node\n")
+		// os.Exit(1)
+		internal_node_split_and_insert(table, parent_page_num, child_page_num)
+		return
 	}
 
 	var right_child_page_num = get_internal_node_right_child(parent)
+	/*
+	 An internal node with a right child of INVALID_PAGE_NUM is empty
+	*/
+	if right_child_page_num == INVALID_PAGE_NUM {
+		set_internal_node_right_child(parent, uint32(child_page_num))
+		return
+	}
+
 	var right_child = get_page(&table.pager, int32(right_child_page_num))
 
-	if child_max_key > get_node_max_key(right_child) {
+	/*
+		If we are already at the max number of cells for a node, we cannot increment
+		before splitting. Incrementing without inserting a new key/child pair
+		and immediately calling internal_node_split_and_insert has the effect
+		of creating a new key at (max_cells + 1) with an uninitialized value
+	*/
+	set_internal_node_num_keys(parent, original_num_keys+1)
+
+	if child_max_key > get_node_max_key(&table.pager, right_child) {
 		/* Replace right child */
 		set_internal_node_child(parent, uint32(original_num_keys), right_child_page_num)
-		set_internal_node_key(parent, uint32(original_num_keys), uint32(get_node_max_key(right_child)))
+		set_internal_node_key(parent, uint32(original_num_keys), uint32(get_node_max_key(&table.pager, right_child)))
 		set_internal_node_right_child(parent, uint32(child_page_num))
-
 	} else {
 		/* Make room for the new cell */
 		for i := uint32(original_num_keys); i > index; i-- {
@@ -693,35 +601,6 @@ func internal_node_insert(table *Table, parent_page_num int32,
 		set_internal_node_key(parent, index, uint32(child_max_key))
 	}
 }
-
-// +Cursor* leaf_node_find(Table* table, uint32_t page_num, uint32_t key) {
-// 	+  void* node = get_page(table->pager, page_num);
-// 	+  uint32_t num_cells = *leaf_node_num_cells(node);
-// 	+
-// 	+  Cursor* cursor = malloc(sizeof(Cursor));
-// 	+  cursor->table = table;
-// 	+  cursor->page_num = page_num;
-// 	+
-// 	+  // Binary search
-// 	+  uint32_t min_index = 0;
-// 	+  uint32_t one_past_max_index = num_cells;
-// 	+  while (one_past_max_index != min_index) {
-// 	+    uint32_t index = (min_index + one_past_max_index) / 2;
-// 	+    uint32_t key_at_index = *leaf_node_key(node, index);
-// 	+    if (key == key_at_index) {
-// 	+      cursor->cell_num = index;
-// 	+      return cursor;
-// 	+    }
-// 	+    if (key < key_at_index) {
-// 	+      one_past_max_index = index;
-// 	+    } else {
-// 	+      min_index = index + 1;
-// 	+    }
-// 	+  }
-// 	+
-// 	+  cursor->cell_num = min_index;
-// 	+  return cursor;
-// 	+}
 
 func leaf_node_find(table *Table, page_num int32, key int32) Cursor {
 
@@ -753,16 +632,6 @@ func leaf_node_find(table *Table, page_num int32, key int32) Cursor {
 	return cursor
 }
 
-// NodeType get_node_type(void* node) {
-// 	uint8_t value = *((uint8_t*)(node + NODE_TYPE_OFFSET));
-// 	return (NodeType)value;
-// }
-
-// void set_node_type(void* node, NodeType type) {
-// 	uint8_t value = type;
-// 	*((uint8_t*)(node + NODE_TYPE_OFFSET)) = value;
-// }
-
 func get_node_type(node []byte) int32 {
 
 	// uint8_t value = *((uint8_t*)(node + NODE_TYPE_OFFSET));
@@ -774,14 +643,6 @@ func get_node_type(node []byte) int32 {
 	}
 	return ret
 }
-
-// b := leaf_node_cell(node, cell_num)
-// b2, err := utils.IntToBytes(int(new_key), 4)
-
-// if err != nil {
-// 	fmt.Println(err)
-// }
-// copy(b, b2)
 
 func set_node_type(node []byte, nodeType uint8) {
 
@@ -831,31 +692,6 @@ func cursor_advance(cursor *Cursor) {
 		}
 	}
 }
-
-// func row_slot(table *Table, row_num int) []byte {
-// 	page_num := row_num / ROWS_PER_PAGE
-// 	page := table.pager.pages[page_num]
-// 	row_offset := row_num % ROWS_PER_PAGE
-// 	byte_offset := row_offset * ROW_SIZE
-// 	return page[byte_offset:]
-// }
-
-// func cursor_value_tuple(cursor *Cursor) (int, int) {
-// 	row_num := cursor.row_num
-// 	page_num := row_num / ROWS_PER_PAGE
-// 	// page := get_page(&cursor.table.pager, int32(page_num))
-// 	row_offset := row_num % ROWS_PER_PAGE
-// 	byte_offset := row_offset * ROW_SIZE
-// 	return page_num, byte_offset
-// }
-
-// func row_slot_tuple(table *Table, row_num int) (int, int) {
-// 	page_num := row_num / ROWS_PER_PAGE
-// 	// page := table.pages[page_num]
-// 	row_offset := row_num % ROWS_PER_PAGE
-// 	byte_offset := row_offset * ROW_SIZE
-// 	return page_num, byte_offset
-// }
 
 func new_table() Table {
 	fmt.Println("malloc the table!")
@@ -912,69 +748,10 @@ func db_open(filename string) Table {
 		// new database file. Initialize page 0 as leaf node
 		root_node := get_page(&table.pager, 0)
 		initialize_leaf_node(root_node)
+		set_node_root(root_node, true)
 	}
 	return table
 }
-
-// func get_page(pager *Pager, page_num int32) []byte {
-
-// 	// no cache missed. load data from file everytime
-// 	if page_num > TABLE_MAX_PAGES {
-// 		fmt.Println("Tried to fetch page number out of bounds.%d > %d\n", page_num, TABLE_MAX_PAGES)
-// 		os.Exit(1)
-// 	}
-
-// 	var num_pages int64 = pager.file_length / PAGE_SIZE
-// 	var realLen = pager.file_length - PAGE_SIZE*num_pages
-
-// 	if pager.file_length > PAGE_SIZE*num_pages {
-// 		num_pages += 1
-// 	}
-
-// 	if page_num < int32(num_pages) {
-// 		_, err := pager.file_descriptor.ReadAt(pager.pages[page_num][:realLen], int64(page_num*PAGE_SIZE))
-// 		if err != nil {
-// 			fmt.Println(" read page failed! ", err)
-// 		}
-// 	}
-
-// 	if page_num >= pager.num_pages {
-// 		pager.num_pages = page_num + 1
-// 	}
-
-// 	return pager.pages[:]
-// 	// return pager.pages[page_num][:]
-// }
-
-// func get_page(pager *Pager, page_num int32) []byte {
-
-// 	// no cache missed. load data from file everytime
-// 	if page_num > TABLE_MAX_PAGES {
-// 		fmt.Println("Tried to fetch page number out of bounds.%d > %d\n", page_num, TABLE_MAX_PAGES)
-// 		os.Exit(1)
-// 	}
-
-// 	var num_pages int64 = pager.file_length / PAGE_SIZE
-// 	var realLen = pager.file_length - PAGE_SIZE*num_pages
-
-// 	if pager.file_length > PAGE_SIZE*num_pages {
-// 		num_pages += 1
-// 	}
-
-// 	if page_num < int32(num_pages) {
-// 		_, err := pager.file_descriptor.ReadAt(pager.pages[page_num][:realLen], int64(page_num*PAGE_SIZE))
-// 		if err != nil {
-// 			fmt.Println(" read page failed! ", err)
-// 		}
-// 	}
-
-// 	if page_num >= pager.num_pages {
-// 		pager.num_pages = page_num + 1
-// 	}
-
-// 	return pager.pages[:]
-// 	// return pager.pages[page_num][:]
-// }
 
 func get_page(pager *Pager, page_num int32) []byte {
 
@@ -1004,6 +781,7 @@ func db_close(table *Table) {
 	// if num_additional_rows > 0 {
 	// 	var page_num int = num_full_pages
 	// 	pager_flush(&pager, page_num, num_additional_rows*ROW_SIZE)
+
 	// }
 
 	err := pager.file_descriptor.Close()
@@ -1013,14 +791,6 @@ func db_close(table *Table) {
 
 }
 
-// func pager_flush(pager *Pager, page_num int, size int) {
-
-// 	_, err := pager.file_descriptor.WriteAt(pager.pages[page_num][:size], int64(page_num*PAGE_SIZE))
-// 	if err != nil {
-// 		fmt.Println("write page failed! ", err)
-// 	}
-// }
-
 func pager_flush(pager *Pager, page_num int) {
 
 	_, err := pager.file_descriptor.WriteAt(pager.pages[page_num][:PAGE_SIZE], int64(page_num*PAGE_SIZE))
@@ -1028,10 +798,6 @@ func pager_flush(pager *Pager, page_num int) {
 		fmt.Println("write page failed! ", err)
 	}
 }
-
-// +const uint32_t LEAF_NODE_RIGHT_SPLIT_COUNT = (LEAF_NODE_MAX_CELLS + 1) / 2;
-// +const uint32_t LEAF_NODE_LEFT_SPLIT_COUNT =
-// +    (LEAF_NODE_MAX_CELLS + 1) - LEAF_NODE_RIGHT_SPLIT_COUNT;
 
 const (
 	LEAF_NODE_RIGHT_SPLIT_COUNT = (LEAF_NODE_MAX_CELLS + 1) / 2
@@ -1066,7 +832,7 @@ func leaf_node_split_and_insert(cursor *Cursor, key uint32, value *enums.Row) {
 	*/
 
 	var old_node = get_page(&cursor.table.pager, cursor.page_num)
-	var old_max = get_node_max_key(old_node)
+	var old_max = get_node_max_key(&cursor.table.pager, old_node)
 	var new_page_num = get_unused_page_num(&cursor.table.pager)
 	var new_node = get_page(&cursor.table.pager, new_page_num)
 	initialize_leaf_node(new_node)
@@ -1122,9 +888,9 @@ func leaf_node_split_and_insert(cursor *Cursor, key uint32, value *enums.Row) {
 		// fmt.Printf("Need to implement updating parent after split\n")
 		// os.Exit(1)
 		var parent_page_num = get_node_parent(old_node)
-		var new_max = get_node_max_key(old_node)
+		var new_max = get_node_max_key(&cursor.table.pager, old_node)
 		var parent = get_page(&cursor.table.pager, parent_page_num)
-
+		//  todo 2023/6/13 why it takes leaf node as internal node to parse and get the wierd parsed number
 		update_internal_node_key(parent, uint32(old_max), uint32(new_max))
 		internal_node_insert(cursor.table, parent_page_num, new_page_num)
 	}
@@ -1150,35 +916,38 @@ func create_new_root(table *Table, right_child_page_num uint32) {
 	var left_child_page_num = get_unused_page_num(&table.pager)
 	var left_child = get_page(&table.pager, left_child_page_num)
 
+	if get_node_type(root) == enums.NodeType.NODE_INTERNAL {
+		initialize_internal_node(right_child)
+		initialize_internal_node(left_child)
+	}
+
 	/* Left child has data copied from old root */
 	// memcpy(left_child, root, PAGE_SIZE);
 	copy(left_child, root[:PAGE_SIZE])
 	set_node_root(left_child, false)
+
+	if get_node_type(left_child) == enums.NodeType.NODE_INTERNAL {
+		var child []byte
+		for i := int32(0); i < get_internal_node_num_keys(left_child); i++ {
+			child = get_page(&table.pager, int32(get_internal_node_child(left_child, uint32(i))))
+			set_node_parent(child, left_child_page_num)
+		}
+		child = get_page(&table.pager, int32(get_internal_node_right_child(left_child)))
+		set_node_parent(child, left_child_page_num)
+	}
 
 	/* Root node is a new internal node with one key and two children */
 	initialize_internal_node(root)
 	set_node_root(root, true)
 	set_internal_node_num_keys(root, 1)
 	set_internal_node_child(root, 0, uint32(left_child_page_num))
-	var left_child_max_key = get_node_max_key(left_child)
+	var left_child_max_key = get_node_max_key(&table.pager, left_child)
 	set_internal_node_key(root, 0, uint32(left_child_max_key))
 	set_internal_node_right_child(root, right_child_page_num)
 
 	set_node_parent(left_child, table.root_page_num)
 	set_node_parent(right_child, table.root_page_num)
 }
-
-// +/*
-// + * Internal Node Header Layout
-// + */
-// +const uint32_t INTERNAL_NODE_NUM_KEYS_SIZE = sizeof(uint32_t);
-// +const uint32_t INTERNAL_NODE_NUM_KEYS_OFFSET = COMMON_NODE_HEADER_SIZE;
-// +const uint32_t INTERNAL_NODE_RIGHT_CHILD_SIZE = sizeof(uint32_t);
-// +const uint32_t INTERNAL_NODE_RIGHT_CHILD_OFFSET =
-// +    INTERNAL_NODE_NUM_KEYS_OFFSET + INTERNAL_NODE_NUM_KEYS_SIZE;
-// +const uint32_t INTERNAL_NODE_HEADER_SIZE = COMMON_NODE_HEADER_SIZE +
-// +                                           INTERNAL_NODE_NUM_KEYS_SIZE +
-// +                                           INTERNAL_NODE_RIGHT_CHILD_SIZE;
 
 /*
  * Internal Node Header Layout
@@ -1193,14 +962,6 @@ const (
 		INTERNAL_NODE_NUM_KEYS_SIZE + INTERNAL_NODE_RIGHT_CHILD_SIZE
 )
 
-// +/*
-// + * Internal Node Body Layout
-// + */
-// +const uint32_t INTERNAL_NODE_KEY_SIZE = sizeof(uint32_t);
-// +const uint32_t INTERNAL_NODE_CHILD_SIZE = sizeof(uint32_t);
-// +const uint32_t INTERNAL_NODE_CELL_SIZE =
-// +    INTERNAL_NODE_CHILD_SIZE + INTERNAL_NODE_KEY_SIZE;
-
 /*
  * Internal Node Body Layout
  */
@@ -1211,11 +972,7 @@ const (
 	INTERNAL_NODE_MAX_CELLS  = 3
 )
 
-// func internal_node_num_keys(node []byte) []byte {
-// 	return node[:INTERNAL_NODE_NUM_KEYS_OFFSET]
-// }
-
-func set_internal_node_num_keys(node []byte, num int) {
+func set_internal_node_num_keys(node []byte, num int32) {
 
 	b2, err := utils.IntToBytes(int(num), byte(INTERNAL_NODE_NUM_KEYS_SIZE))
 	if err != nil {
@@ -1287,14 +1044,37 @@ func get_internal_node_child(node []byte, child_num uint32) uint32 {
 		os.Exit(1)
 	} else if child_num == uint32(num_keys) {
 		b = internal_node_right_child(node)
+		right_child, err := utils.BytesToInt(b[:INTERNAL_NODE_CHILD_SIZE], false)
+		if err != nil {
+			fmt.Println(err)
+		}
+		if right_child == INVALID_PAGE_NUM {
+			fmt.Printf("Tried to access right child of node, but was invalid page\n")
+			os.Exit(1)
+		}
+		return uint32(right_child)
+		// b = internal_node_right_child(node)
 	} else {
 		b = get_internal_node_cell(node, child_num)
+		child, err := utils.BytesToInt(b[:INTERNAL_NODE_CHILD_SIZE], false)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		if child == INVALID_PAGE_NUM {
+			fmt.Printf("Tried to access child %d of node, but was invalid page\n", child_num)
+			os.Exit(1)
+		}
+		return uint32(child)
+		// b = get_internal_node_cell(node, child_num)
 	}
-	ret, err := utils.BytesToInt(b[:INTERNAL_NODE_CHILD_SIZE], false)
-	if err != nil {
-		fmt.Println(err)
-	}
-	return uint32(ret)
+
+	return 9999
+	// ret, err := utils.BytesToInt(b[:INTERNAL_NODE_CHILD_SIZE], false)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
+	// return uint32(ret)
 }
 
 func internal_node_child(node []byte, child_num uint32) []byte {
@@ -1354,14 +1134,13 @@ func get_internal_node_key(node []byte, key_num uint32) int32 {
 	// return internal_node_cell(node, key_num) + INTERNAL_NODE_CHILD_SIZE
 }
 
-func get_node_max_key(node []byte) int32 {
-	switch get_node_type(node) {
-	case enums.NodeType.NODE_INTERNAL:
-		return get_internal_node_key(node, uint32(get_internal_node_num_keys(node))-1)
-	case enums.NodeType.NODE_LEAF:
-		return leaf_node_key(node, int32(leaf_node_num_cells(node))-1)
+func get_node_max_key(pager *Pager, node []byte) int32 {
+
+	if get_node_type(node) == enums.NodeType.NODE_LEAF {
+		return leaf_node_key(node, int32(leaf_node_num_cells(node)-1))
 	}
-	return 0
+	var right_child = get_page(pager, int32(get_internal_node_right_child(node)))
+	return get_node_max_key(pager, right_child)
 }
 
 // Keeping Track of the Root
@@ -1391,22 +1170,17 @@ func set_node_root(node []byte, is_root bool) {
 	//   *((uint8_t*)(node + IS_ROOT_OFFSET)) = value;
 }
 
-// void initialize_leaf_node(void* node) {
-// 	set_node_type(node, NODE_LEAF);
-//  +  set_node_root(node, false);
-// 	*leaf_node_num_cells(node) = 0;
-//   }
-
-//  +void initialize_internal_node(void* node) {
-//  +  set_node_type(node, NODE_INTERNAL);
-//  +  set_node_root(node, false);
-//  +  *internal_node_num_keys(node) = 0;
-//  +}
-
 func initialize_internal_node(node []byte) {
 	set_node_type(node, uint8(enums.NodeType.NODE_INTERNAL))
 	set_node_root(node, false)
 	set_internal_node_num_keys(node, 0)
+
+	/*
+	  Necessary because the root page number is 0; by not initializing an internal
+	  node's right child to an invalid page number when initializing the node, we may
+	  end up with 0 as the node's right child, which makes the node a parent of the root
+	*/
+	set_internal_node_right_child(node, INVALID_PAGE_NUM)
 }
 
 func update_internal_node_key(node []byte, old_key uint32, new_key uint32) {
@@ -1414,11 +1188,111 @@ func update_internal_node_key(node []byte, old_key uint32, new_key uint32) {
 	set_internal_node_key(node, old_child_index, new_key)
 }
 
-//      // New database file. Initialize page 0 as leaf node.
-//      void* root_node = get_page(pager, 0);
-//      initialize_leaf_node(root_node);
-// +    set_node_root(root_node, true);
-//    }
+const (
+	INVALID_PAGE_NUM = math.MaxInt32
+)
+
+func internal_node_split_and_insert(table *Table, parent_page_num int32,
+	child_page_num int32) {
+	var old_page_num = parent_page_num
+	var old_node = get_page(&table.pager, parent_page_num)
+	var old_max = get_node_max_key(&table.pager, old_node)
+
+	var child = get_page(&table.pager, child_page_num)
+	var child_max = get_node_max_key(&table.pager, child)
+
+	var new_page_num = get_unused_page_num(&table.pager)
+
+	/*
+	  Declaring a flag before updating pointers which
+	  records whether this operation involves splitting the root -
+	  if it does, we will insert our newly created node during
+	  the step where the table's new root is created. If it does
+	  not, we have to insert the newly created node into its parent
+	  after the old node's keys have been transferred over. We are not
+	  able to do this if the newly created node's parent is not a newly
+	  initialized root node, because in that case its parent may have existing
+	  keys aside from our old node which we are splitting. If that is true, we
+	  need to find a place for our newly created node in its parent, and we
+	  cannot insert it at the correct index if it does not yet have any keys
+	*/
+	var splitting_root = is_node_root(old_node)
+
+	var parent []byte
+	var new_node []byte
+	if splitting_root {
+		create_new_root(table, uint32(new_page_num))
+		parent = get_page(&table.pager, table.root_page_num)
+		/*
+			If we are splitting the root, we need to update old_node to point
+			to the new root's left child, new_page_num will already point to
+			the new root's right child
+		*/
+		old_page_num = int32(get_internal_node_child(parent, 0))
+		old_node = get_page(&table.pager, old_page_num)
+	} else {
+		parent = get_page(&table.pager, get_node_parent(old_node))
+		new_node = get_page(&table.pager, new_page_num)
+		initialize_internal_node(new_node)
+	}
+
+	var old_num_keys = get_internal_node_num_keys(old_node)
+	var cur_page_num = get_internal_node_right_child(old_node)
+	var cur = get_page(&table.pager, int32(cur_page_num))
+
+	/*
+		First put right child into new node and set right child of old node to invalid page number
+	*/
+	internal_node_insert(table, new_page_num, int32(cur_page_num))
+	set_node_parent(cur, new_page_num)
+	set_internal_node_right_child(old_node, INVALID_PAGE_NUM)
+	/*
+		For each key until you get to the middle key, move the key and the child to the new node
+	*/
+	for i := INTERNAL_NODE_MAX_CELLS - 1; i > INTERNAL_NODE_MAX_CELLS/2; i-- {
+		cur_page_num = get_internal_node_child(old_node, uint32(i))
+		cur = get_page(&table.pager, int32(cur_page_num))
+
+		internal_node_insert(table, new_page_num, int32(cur_page_num))
+		set_node_parent(cur, new_page_num)
+
+		// Este operador en Go es independiente, lo que significa que es incapaz de
+		// combinarse con otros, además, solo puede seguir a la variable en lugar
+		// de estar al frente de ella.
+		old_num_keys--
+	}
+
+	/*
+		Set child before middle key, which is now the highest key, to be node's right child,
+		and decrement number of keys
+	*/
+	var indc = get_internal_node_child(old_node, uint32(old_num_keys-1))
+	set_internal_node_right_child(old_node, indc)
+	old_num_keys--
+
+	/*
+		Determine which of the two nodes after the split should contain the child to be inserted,
+		and insert the child
+	*/
+	var max_after_split = get_node_max_key(&table.pager, old_node)
+
+	// destination_page_num := child_max<max_after_split?old_page_num:new_page_num
+	// no tenary operator in golang
+	var destination_page_num = new_page_num
+	if child_max < max_after_split {
+		destination_page_num = old_page_num
+	}
+
+	internal_node_insert(table, destination_page_num, child_page_num)
+	set_node_parent(child, destination_page_num)
+
+	update_internal_node_key(parent, uint32(old_max), uint32(get_node_max_key(&table.pager, old_node)))
+
+	if !splitting_root {
+		internal_node_insert(table, get_node_parent(old_node), new_page_num)
+		set_node_parent(new_node, get_node_parent(old_node))
+	}
+}
 
 func indent(level uint32) {
 	for i := uint32(0); i < level; i++ {
@@ -1441,16 +1315,20 @@ func print_tree(pager *Pager, page_num uint32, indentation_level uint32) {
 			indent(indentation_level + 1)
 			fmt.Println("- %d", leaf_node_key(node, int32(i)))
 		}
-		break
+		// break
 	case (enums.NodeType.NODE_INTERNAL):
 		num_keys := get_internal_node_num_keys(node)
 		indent(indentation_level)
 		fmt.Println("- internal (size %d)", num_keys)
-		for i := int32(0); i < num_keys; i++ {
-			child = get_internal_node_child(node, uint32(i))
-			print_tree(pager, child, indentation_level+1)
-			indent(indentation_level + 1)
-			fmt.Println("- key %d", get_internal_node_key(node, uint32(i)))
+
+		if num_keys > 0 {
+			for i := int32(0); i < num_keys; i++ {
+				child = get_internal_node_child(node, uint32(i))
+				print_tree(pager, child, indentation_level+1)
+
+				indent(indentation_level + 1)
+				fmt.Printf("- key %d\n", get_internal_node_key(node, uint32(i)))
+			}
 		}
 		child = get_internal_node_right_child(node)
 		print_tree(pager, child, indentation_level+1)
@@ -1492,14 +1370,14 @@ loop:
 
 		flag.Parse()
 		// var index = *rowIndex
-		var index = "14"
-		input_template := "insert #{i} user#{i} person#{i}@example.com"
-		input := strings.Replace(input_template, "#{i}", index, -1)
+		// var index = "14"
+		// input_template := "insert #{i} user#{i} person#{i}@example.com"
+		// input := strings.Replace(input_template, "#{i}", index, -1)
 
 		// input := "insert 1 cstack foo@bar.com"
 		// input := "insert 2 cstack2 foo@bar.com"
 		// input := "select"
-		// input := ".btree"
+		input := ".btree"
 
 		if strings.HasPrefix(input, ".") {
 			switch do_meta_command(input, &table) {
